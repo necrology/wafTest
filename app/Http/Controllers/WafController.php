@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 
 class WafController extends Controller
 {
-   public function youFoundMe(){
-    return view('youfoundme1');
+   public function youfoundme(){
+    return view('youfoundme');
    }
 }
