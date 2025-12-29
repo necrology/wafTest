@@ -14,8 +14,11 @@ use App\Http\Controllers\WafController;
 |
 */
 
-Route::get('/', function () {
+Route::middleware('throttle:global')->group(function () {
+    Route::get('/', function () {
     return view('welcome');
 });
 
 Route::get('/youfoundme', [WafController::class, 'youfoundme'])->name('youfoundme');
+});
+
