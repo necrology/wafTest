@@ -18,4 +18,4 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/youFoundMe', [WafController::class, 'youFoundMe'])->name('youFoundMe');
+Route::get('/youFoundMe', [WafController::class, 'youFoundMe'])->name('youfoundme');
