@@ -9,30 +9,32 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AntiFuzzingMiddleware
 {
-    public function handle(Request $request, Closure $next): Response
-    {
-        $userAgent = $request->header('User-Agent');
-        $ip = $request->ip();
-        $cacheKey = 'banned_ip_' . $ip;
+    public function handle(Request $request, Closure $next)
+{
+    $ip = $request->ip();
+    $blockKey = 'banned_ip_' . $ip;
+    $hitCountKey = 'hit_404_count_' . $ip;
 
-        // 1. Cek apakah IP ini sudah masuk daftar blokir sementara
-        if (Cache::has($cacheKey)) {
-            return response()->json(['message' => 'Access Denied'], 403);
-        }
-
-        // 2. Deteksi User-Agent ffuf atau tools populer lainnya
-        if (str_contains($userAgent, 'Fuzz Faster U Fool') || str_contains($userAgent, 'ffuf')) {
-            // Blokir IP selama 24 jam karena terdeteksi menggunakan alat penyerang
-            Cache::put($cacheKey, true, now()->addDay());
-            return response()->json(['message' => 'Security Triggered'], 403);
-        }
-
-        // 3. Deteksi pola URL mencurigakan (Honeypot)
-        if ($request->is('wafTest*') || $request->is('*.env') || $request->is('wp-admin*')) {
-            Cache::put($cacheKey, true, now()->addDay());
-            return response()->json(['message' => 'Target not found'], 404);
-        }
-
-        return $next($request);
+    // 1. Cek apakah sudah diblokir
+    if (Cache::has($blockKey)) {
+        return response()->json(['message' => 'Your IP is temporarily banned.'], 403);
     }
+
+    $response = $next($request);
+
+    // 2. Jika request menghasilkan 404 (Halaman tidak ditemukan)
+    if ($response->getStatusCode() === 404) {
+        // Tambah hitungan 404 di Redis (berlaku selama 5 menit)
+        $hits = Cache::increment($hitCountKey);
+        Cache::put($hitCountKey, $hits, now()->addMinutes(5));
+
+        // 3. Jika IP ini memicu lebih dari 10 kali 404 dalam 5 menit, blokir permanen/lama
+        if ($hits >= 10) {
+            Cache::put($blockKey, true, now()->addDays(1)); // Blokir 1 hari
+            Log::warning("IP $ip otomatis diblokir karena serangan fuzzing/404.");
+        }
+    }
+
+    return $response;
+}
 }
